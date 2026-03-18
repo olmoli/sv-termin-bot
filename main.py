@@ -1,9 +1,10 @@
 import asyncio
 import logging
 
-from config import TELEGRAM_TOKEN, CHECK_INTERVAL, TERMIN_URL
+from config import TELEGRAM_TOKEN, CHECK_INTERVAL, TERMIN_URL, VERSION
 from scraper import check_appointments
 from telegram_bot import build_application, send_alert
+import state
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,13 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 async def monitor_loop(application) -> None:
-    """
-    Prüft alle CHECK_INTERVAL Sekunden, ob ein Termin frei ist.
-    Sendet nur eine Benachrichtigung, wenn sich der Status von
-    'nicht verfügbar' auf 'verfügbar' ändert (verhindert Spam).
-    """
-    last_available = False  # Bonus: doppelte Benachrichtigungen verhindern
-
     logger.info(
         "Monitor gestartet. Prüfe alle %d Sekunden: %s",
         CHECK_INTERVAL,
@@ -32,21 +26,35 @@ async def monitor_loop(application) -> None:
 
     while True:
         try:
-            available = await check_appointments(TERMIN_URL)
+            should_notify = False
+            notify_url = ""
+            notify_date = ""
 
-            if available and not last_available:
-                # Status wechselte von 'kein Termin' auf 'Termin frei'
-                logger.info("Termin verfügbar! Sende Benachrichtigungen...")
-                await send_alert(application, TERMIN_URL)
-            elif not available and last_available:
-                logger.info("Termin nicht mehr verfügbar.")
-            else:
-                logger.info(
-                    "Status unverändert: %s",
-                    "verfügbar" if available else "kein Termin",
-                )
+            async with state.check_lock:
+                available, booking_url, first_date = await check_appointments(TERMIN_URL)
 
-            last_available = available
+                if available:
+                    current_date = state.parse_date(first_date)
+                    if current_date and (
+                        state.last_notified_date is None
+                        or current_date < state.last_notified_date
+                    ):
+                        should_notify = True
+                        notify_url = booking_url
+                        notify_date = first_date
+                        state.last_notified_date = current_date
+                        logger.info("Neuer frühester Termin: %s – sende Benachrichtigung.", first_date)
+                    else:
+                        logger.info("Bekannter oder späterer Termin (%s) – keine Benachrichtigung.", first_date)
+                else:
+                    if state.last_notified_date is not None:
+                        logger.info("Keine Termine mehr verfügbar – Reset.")
+                        state.last_notified_date = None
+                    else:
+                        logger.info("Kein Termin verfügbar.")
+
+            if should_notify:
+                await send_alert(application, notify_url, notify_date)
 
         except Exception as e:
             logger.error("Fehler im Monitor-Loop: %s", e)
@@ -57,12 +65,11 @@ async def monitor_loop(application) -> None:
 async def main() -> None:
     application = build_application(TELEGRAM_TOKEN)
 
-    # Telegram-Bot und Monitor-Loop gleichzeitig starten
     async with application:
         await application.start()
         await application.updater.start_polling()
 
-        logger.info("Bot läuft. Drücke Ctrl+C zum Beenden.")
+        logger.info("sv-termin-bot v%s gestartet.", VERSION)
 
         try:
             await monitor_loop(application)
