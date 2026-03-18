@@ -20,3 +20,6 @@ build/
 
 # Logs
 *.log
+
+# Subscriber-Daten (lokal, nicht committen)
+subscribers.json
