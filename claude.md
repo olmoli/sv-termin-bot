@@ -1,6 +1,6 @@
 # sv-termin-bot — Project Knowledge Base
 
-**Version: v0.25**
+**Version: v0.26**
 
 ---
 
@@ -16,7 +16,7 @@ A Telegram bot that monitors the Straßenverkehrsamt Bochum (Bochum vehicle regi
 
 ## 2. Current Status
 
-- **Version:** v0.25
+- **Version:** v0.26
 - **State:** MVP complete and functional
 - **Active subscribers:** 1 (chat_id: 836882040)
 - **Check interval:** 300 seconds (5 minutes, configurable via `.env`)
@@ -80,44 +80,31 @@ session-expired page
 
 **Hosting platform:** [railway.com](https://railway.com)
 
-Railway uses [Nixpacks](https://nixpacks.com) for builds. Playwright requires special handling because Railway's Nixpacks uses a **multi-stage build**: system packages installed via `apt-get` during the build stage do NOT carry over to the runtime image. Only app files under `/app` persist.
+Railway detects the [Dockerfile](Dockerfile) and uses it directly. This is more reliable than Nixpacks for Playwright because all layers (OS libs + browser binary) are built into the same image.
 
-**Two-part fix in [nixpacks.toml](nixpacks.toml):**
+```dockerfile
+FROM python:3.13-slim
 
-1. `[phases.setup]` — declares Chromium's OS-level shared libraries as `aptPkgs`. Nixpacks bakes these into the **runtime** image, so they're available when the app runs.
-2. `[phases.install]` — installs pip packages and downloads the Chromium browser binary to `/app/ms-playwright` (controlled via `PLAYWRIGHT_BROWSERS_PATH` env var).
+WORKDIR /app
 
-```toml
-[phases.setup]
-aptPkgs = [
-  "libglib2.0-0", "libnss3", "libnspr4", "libatk1.0-0",
-  "libatk-bridge2.0-0", "libcups2", "libdrm2", "libdbus-1-3",
-  "libxcb1", "libxkbcommon0", "libx11-6", "libxcomposite1",
-  "libxdamage1", "libxext6", "libxfixes3", "libxrandr2",
-  "libgbm1", "libpango-1.0-0", "libcairo2", "libasound2",
-  "libxss1", "libgtk-3-0"
-]
+COPY requirements.txt .
+RUN pip install -r requirements.txt && \
+    python -m playwright install --with-deps chromium
 
-[phases.install]
-cmds = [
-  "pip install -r requirements.txt",
-  "python -m playwright install chromium"
-]
+COPY . .
 
-[start]
-cmd = "python main.py"
+CMD ["python", "main.py"]
 ```
+
+`--with-deps` installs both the Chromium binary and all required OS shared libraries (libglib, libnss, etc.) in the same layer — they persist into the runtime image.
+
+**Railway dashboard settings:**
+- **Custom Build Command**: leave empty (Railway uses the Dockerfile automatically)
+- **Custom Start Command**: leave empty (Dockerfile `CMD` handles it)
 
 **Environment variables to set in Railway dashboard:**
 - `TELEGRAM_TOKEN` — required
-- `PLAYWRIGHT_BROWSERS_PATH` — set to `/app/ms-playwright` (puts browser binary inside the app layer so it survives the multi-stage build)
 - `CHECK_INTERVAL` — optional (default 300s)
-
-**Custom Build Command in Railway UI:**
-```
-pip install -r requirements.txt && python -m playwright install chromium
-```
-This overrides `[phases.install]` in nixpacks.toml but `[phases.setup]` (aptPkgs) is still respected.
 
 **Known issues (all resolved):**
 
@@ -145,7 +132,8 @@ Dual output: console + `sv_termin_bot.log` (UTF-8, includes timestamps).
 | [requirements.txt](requirements.txt) | `python-telegram-bot==21.6`, `playwright>=1.50.0`, `python-dotenv==1.0.1` |
 | [.env.example](.env.example) | Template for environment variables |
 | [subscribers.json](subscribers.json) | Persisted `{chat_id: bool}` subscriptions |
-| [nixpacks.toml](nixpacks.toml) | Railway build config: aptPkgs for Chromium deps + browser install |
+| [Dockerfile](Dockerfile) | Railway build: installs Python deps + Chromium with OS libs via `--with-deps` |
+| [nixpacks.toml](nixpacks.toml) | Legacy Railway build config (superseded by Dockerfile) |
 
 ---
 
@@ -156,7 +144,7 @@ Dual output: console + `sv_termin_bot.log` (UTF-8, includes timestamps).
 - **Deduplication by earliest date:** Prevents alert spam when the same slot stays open across multiple check cycles. Resets when no appointments exist, ready for the next alert.
 - **asyncio.Lock for scraper:** Ensures only one Playwright session runs at a time, avoiding resource conflicts and race conditions.
 - **German date parsing:** `state.parse_date()` handles the format `"Montag 13.04.2026 10:45"` as returned by the booking UI.
-- **PLAYWRIGHT_BROWSERS_PATH=/app/ms-playwright:** Redirects Chromium install to the app directory, which survives Railway's multi-stage Nixpacks build. Without this, the browser lands in `/root/.cache` which is discarded at runtime.
+- **Dockerfile over Nixpacks:** Railway's Nixpacks multi-stage build discards OS-level shared libraries installed during the build phase. A Dockerfile with `playwright install --with-deps chromium` builds everything into one layer, so libs and browser binary both survive to runtime.
 
 ---
 
