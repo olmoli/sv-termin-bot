@@ -1,6 +1,6 @@
 # sv-termin-bot — Project Knowledge Base
 
-**Version: v0.22**
+**Version: v0.24**
 
 ---
 
@@ -16,7 +16,7 @@ A Telegram bot that monitors the Straßenverkehrsamt Bochum (Bochum vehicle regi
 
 ## 2. Current Status
 
-- **Version:** v0.22
+- **Version:** v0.24
 - **State:** MVP complete and functional
 - **Active subscribers:** 1 (chat_id: 836882040)
 - **Check interval:** 300 seconds (5 minutes, configurable via `.env`)
@@ -82,13 +82,13 @@ session-expired page
 
 Railway uses [Nixpacks](https://nixpacks.com) for builds. Playwright requires an explicit browser install step that Railway does NOT run by default.
 
-**Fix:** [nixpacks.toml](nixpacks.toml) at the project root instructs Railway to run `playwright install --with-deps chromium` during the build phase. The `--with-deps` flag installs all required OS-level Chromium dependencies (libnss, libatk, etc.).
+**Fix:** [nixpacks.toml](nixpacks.toml) at the project root instructs Railway to run `python -m playwright install --with-deps chromium` during the build phase. Using `python -m playwright` ensures the venv's playwright binary is used (not a system one), so the installed browser version matches exactly. The `--with-deps` flag installs all required OS-level Chromium dependencies (libnss, libatk, etc.).
 
 ```toml
 [phases.install]
 cmds = [
   "pip install -r requirements.txt",
-  "playwright install --with-deps chromium"
+  "python -m playwright install --with-deps chromium"
 ]
 
 [start]
