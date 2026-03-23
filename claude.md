@@ -1,6 +1,6 @@
 # sv-termin-bot — Project Knowledge Base
 
-**Version: v0.26**
+**Version: v0.27**
 
 ---
 
@@ -16,7 +16,7 @@ A Telegram bot that monitors the Straßenverkehrsamt Bochum (Bochum vehicle regi
 
 ## 2. Current Status
 
-- **Version:** v0.26
+- **Version:** v0.27
 - **State:** MVP complete and functional
 - **Active subscribers:** 1 (chat_id: 836882040)
 - **Check interval:** 300 seconds (5 minutes, configurable via `.env`)
@@ -106,13 +106,13 @@ CMD ["python", "main.py"]
 - `TELEGRAM_TOKEN` — required
 - `CHECK_INTERVAL` — optional (default 300s)
 
-**Known issues (all resolved):**
+**Deployment is confirmed working.** Three issues were encountered and resolved during initial Railway setup:
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `Executable doesn't exist at /root/.cache/ms-playwright/...` | Browser not installed during build | `nixpacks.toml` + custom build command |
-| Browser found but `libglib-2.0.so.0: cannot open shared object file` | OS libs installed at build time but not copied to runtime image | Declare libs in `[phases.setup] aptPkgs` |
-| Browser installed to `/root/.cache` but not found at runtime | Nixpacks multi-stage build discards `/root/.cache` | Set `PLAYWRIGHT_BROWSERS_PATH=/app/ms-playwright` |
+| `Executable doesn't exist at /root/.cache/ms-playwright/...` | Browser not installed during build | Use `python -m playwright install` in build command |
+| `libglib-2.0.so.0: cannot open shared object file` | Nixpacks multi-stage build discards OS libs installed during build stage | Switch to Dockerfile — `--with-deps` installs browser + libs in one layer |
+| Browser not found at `/app/ms-playwright/...` | `PLAYWRIGHT_BROWSERS_PATH` env var leftover from earlier debugging | Remove `PLAYWRIGHT_BROWSERS_PATH` from Railway Variables |
 
 ### Logs
 
