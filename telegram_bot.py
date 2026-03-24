@@ -38,10 +38,12 @@ def _save(subs: dict[int, bool]) -> None:
 subscribers: dict[int, bool] = _load()
 
 
-def _window_label() -> str:
+def _window_label(dative: bool = False) -> str:
     if state.max_days_ahead is None:
-        return "Beliebig"
-    return f"{state.max_days_ahead} {'Tag' if state.max_days_ahead == 1 else 'Tage'}"
+        return "beliebig"
+    if state.max_days_ahead == 1:
+        return "1 Tag"
+    return f"{state.max_days_ahead} Tag{'en' if dative else 'e'}"
 
 
 def _fenster_keyboard() -> InlineKeyboardMarkup:
@@ -60,8 +62,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("Nutzer %d hat den Bot gestartet.", chat_id)
     await update.message.reply_text(
         f"sv-termin-bot v{VERSION}\n\n"
-        "Ich zeige dir gleich den nächsten freien Termin beim Straßenverkehrsamt Bochum.\n\n"
-        f"Für welchen Zeitraum soll ich dich benachrichtigen? (Aktuell: {_window_label()})",
+        "Ich zeige dir gleich den aktuell frühesten Termin beim Straßenverkehrsamt Bochum.\n"
+        "Automatische Alerts bekommst du nur für Termine in deinem Zeitfenster.\n\n"
+        f"Zeitfenster wählen (aktuell: {_window_label()}):",
         reply_markup=_fenster_keyboard(),
     )
 
@@ -103,7 +106,8 @@ async def fenster(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/fenster – Zeitfenster für automatische Alerts einstellen."""
     await update.message.reply_text(
         f"Aktuelles Fenster: {_window_label()}\n\n"
-        "Für welchen Zeitraum soll ich dich benachrichtigen?",
+        "Für welchen Zeitraum soll ich dich automatisch benachrichtigen?\n"
+        "(/start zeigt immer den aktuell frühesten Termin, unabhängig vom Fenster.)",
         reply_markup=_fenster_keyboard(),
     )
 
@@ -118,10 +122,15 @@ async def fenster_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     if value == "any":
         state.max_days_ahead = None
-        label = "Beliebig – ich benachrichtige dich bei allen Terminen."
+        label = "Kein Zeitfenster – ich benachrichtige dich bei allen Terminen."
     else:
         state.max_days_ahead = int(value)
-        label = f"Ich benachrichtige dich nur bei Terminen innerhalb von {_window_label()}."
+        label = f"Ich benachrichtige dich nur bei Terminen innerhalb von {_window_label(dative=True)}."
+
+    # Inform user if the currently known slot is outside the new window
+    if state.last_notified_date and not is_within_window(state.last_notified_date):
+        date_str = state.last_notified_date.strftime("%d.%m.%Y")
+        label += f"\n\nDer aktuell früheste Termin ({date_str}) liegt außerhalb – ich melde mich, sobald ein näherer Termin erscheint."
 
     state.last_notified_date = None  # Reset so next check re-evaluates
     logger.info("Zeitfenster geändert: %s", _window_label())
