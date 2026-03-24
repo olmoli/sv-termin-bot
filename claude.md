@@ -183,3 +183,7 @@ Keep documentation concise and structured. Avoid padding.
 
 ### R5 — Current Status always accurate
 The "Current Status" section and TODO list must always reflect the real state of the project.
+
+### R6 — Commit Message Format
+After every commit, always output the commit message to the user including the version number.
+Example: `"Fix timezone: set Europe/Berlin so scraped times match website display (v0.30)"`
