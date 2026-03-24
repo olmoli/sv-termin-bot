@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from datetime import datetime
@@ -49,7 +50,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         notify_date = ""
 
         async with state.check_lock:
-            available, booking_url, first_date = await check_appointments(TERMIN_URL)
+            available, booking_url, first_date = await asyncio.wait_for(
+                check_appointments(TERMIN_URL), timeout=120
+            )
             if available:
                 current_date = state.parse_date(first_date)
                 should_notify = True

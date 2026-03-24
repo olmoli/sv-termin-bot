@@ -31,7 +31,9 @@ async def monitor_loop(application) -> None:
             notify_date = ""
 
             async with state.check_lock:
-                available, booking_url, first_date = await check_appointments(TERMIN_URL)
+                available, booking_url, first_date = await asyncio.wait_for(
+                    check_appointments(TERMIN_URL), timeout=120
+                )
 
                 if available:
                     current_date = state.parse_date(first_date)
@@ -56,6 +58,8 @@ async def monitor_loop(application) -> None:
             if should_notify:
                 await send_alert(application, notify_url, notify_date)
 
+        except asyncio.TimeoutError:
+            logger.error("Scraper-Timeout nach 120s – überspringe Zyklus.")
         except Exception as e:
             logger.error("Fehler im Monitor-Loop: %s", e)
 
@@ -71,10 +75,12 @@ async def main() -> None:
 
         logger.info("sv-termin-bot v%s gestartet.", VERSION)
 
+        monitor_task = asyncio.create_task(monitor_loop(application))
         try:
-            await monitor_loop(application)
+            await monitor_task
         except (KeyboardInterrupt, asyncio.CancelledError):
             logger.info("Bot wird beendet...")
+            monitor_task.cancel()
         finally:
             await application.updater.stop()
             await application.stop()

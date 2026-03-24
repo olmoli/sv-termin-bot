@@ -38,7 +38,7 @@ async def check_appointments(url: str) -> tuple[bool, str]:
             selects = await page.query_selector_all("select")
             if not selects:
                 logger.error("Keine Auswahl-Dropdowns gefunden.")
-                return False, ""
+                return False, "", ""
             await selects[0].select_option("1")
             await page.wait_for_timeout(500)
 
