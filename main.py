@@ -3,7 +3,7 @@ import logging
 
 from config import TELEGRAM_TOKEN, CHECK_INTERVAL, TERMIN_URL, VERSION
 from scraper import check_appointments
-from telegram_bot import build_application, send_alert
+from telegram_bot import build_application, send_alert, is_within_window
 import state
 
 logging.basicConfig(
@@ -39,11 +39,15 @@ async def monitor_loop(application) -> None:
                     current_date = state.parse_date(first_date)
                     if current_date:
                         if state.last_notified_date is None or current_date < state.last_notified_date:
-                            should_notify = True
-                            notify_url = booking_url
-                            notify_date = first_date
-                            state.last_notified_date = current_date
-                            logger.info("Neuer frühester Termin: %s – sende Benachrichtigung.", first_date)
+                            if is_within_window(current_date):
+                                should_notify = True
+                                notify_url = booking_url
+                                notify_date = first_date
+                                state.last_notified_date = current_date
+                                logger.info("Neuer frühester Termin: %s – sende Benachrichtigung.", first_date)
+                            else:
+                                logger.info("Termin %s außerhalb des Fensters – kein Alert.", first_date)
+                                state.last_notified_date = current_date
                         elif current_date > state.last_notified_date:
                             logger.info("Späterer Termin (%s) – Reset für nächste Verbesserung.", first_date)
                             state.last_notified_date = None

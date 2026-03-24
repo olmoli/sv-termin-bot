@@ -1,10 +1,10 @@
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 import state
 from config import TERMIN_URL, VERSION
@@ -13,6 +13,14 @@ from scraper import check_appointments
 logger = logging.getLogger(__name__)
 
 SUBSCRIBERS_FILE = Path("subscribers.json")
+
+WINDOW_OPTIONS = [
+    ("1 Tag", 1),
+    ("3 Tage", 3),
+    ("7 Tage", 7),
+    ("14 Tage", 14),
+    ("Beliebig", None),
+]
 
 
 def _load() -> dict[int, bool]:
@@ -30,6 +38,20 @@ def _save(subs: dict[int, bool]) -> None:
 subscribers: dict[int, bool] = _load()
 
 
+def _window_label() -> str:
+    if state.max_days_ahead is None:
+        return "Beliebig"
+    return f"{state.max_days_ahead} {'Tag' if state.max_days_ahead == 1 else 'Tage'}"
+
+
+def _fenster_keyboard() -> InlineKeyboardMarkup:
+    buttons = [
+        InlineKeyboardButton(label, callback_data=f"fenster:{days if days is not None else 'any'}")
+        for label, days in WINDOW_OPTIONS
+    ]
+    return InlineKeyboardMarkup([buttons])
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/start – Nutzer registrieren, Benachrichtigungen aktivieren und sofort prüfen."""
     chat_id = update.effective_chat.id
@@ -39,34 +61,25 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         f"sv-termin-bot v{VERSION}\n\n"
         "Ich zeige dir gleich den nächsten freien Termin beim Straßenverkehrsamt Bochum.\n\n"
-        "Danach bekommst du nur noch eine Nachricht, wenn ein früherer Termin frei wird.\n\n"
+        "Automatische Alerts nur wenn ein Termin in dein Zeitfenster fällt (/fenster).\n\n"
         "Mit /stop kannst du die Benachrichtigungen deaktivieren."
     )
 
-    # Sofortcheck nach dem Registrieren
+    # Sofortcheck – ignoriert das Zeitfenster, zeigt immer den besten verfügbaren Termin
     try:
-        should_notify = False
-        notify_url = ""
-        notify_date = ""
-
         async with state.check_lock:
             available, booking_url, first_date = await asyncio.wait_for(
                 check_appointments(TERMIN_URL), timeout=120
             )
             if available:
                 current_date = state.parse_date(first_date)
-                should_notify = True
-                notify_url = booking_url
-                notify_date = first_date
-                # Immer setzen – verhindert dass Monitor denselben Termin nochmal sendet
                 if current_date:
                     state.last_notified_date = current_date
 
-        if should_notify:
+        if available:
             await update.message.reply_text(
-                f"Termin verfügbar!\n"
-                f"Frühester Termin: {notify_date}\n\n"
-                f"Jetzt buchen:\n{notify_url}\n\n"
+                f"Frühester verfügbarer Termin: {first_date}\n\n"
+                f"Jetzt buchen:\n{booking_url}\n\n"
                 f"Einmal auf 'Weiter' klicken."
             )
         else:
@@ -84,6 +97,43 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Benachrichtigungen deaktiviert. Mit /start wieder aktivieren."
     )
+
+
+async def fenster(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/fenster – Zeitfenster für automatische Alerts einstellen."""
+    await update.message.reply_text(
+        f"Aktuelles Fenster: {_window_label()}\n\n"
+        "Für welchen Zeitraum soll ich dich benachrichtigen?",
+        reply_markup=_fenster_keyboard(),
+    )
+
+
+async def fenster_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Verarbeitet Tastendruck beim /fenster-Menü."""
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data  # e.g. "fenster:3" or "fenster:any"
+    value = data.split(":")[1]
+
+    if value == "any":
+        state.max_days_ahead = None
+        label = "Beliebig – ich benachrichtige dich bei allen Terminen."
+    else:
+        state.max_days_ahead = int(value)
+        label = f"Ich benachrichtige dich nur bei Terminen innerhalb von {_window_label()}."
+
+    state.last_notified_date = None  # Reset so next check re-evaluates
+    logger.info("Zeitfenster geändert: %s", _window_label())
+    await query.edit_message_text(f"✓ {label}")
+
+
+def is_within_window(appointment_date: datetime) -> bool:
+    """Prüft ob ein Termin innerhalb des eingestellten Zeitfensters liegt."""
+    if state.max_days_ahead is None:
+        return True
+    deadline = datetime.now() + timedelta(days=state.max_days_ahead)
+    return appointment_date <= deadline
 
 
 async def send_alert(application: Application, booking_url: str, first_date: str) -> None:
@@ -113,4 +163,6 @@ def build_application(token: str) -> Application:
     application = Application.builder().token(token).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("stop", stop))
+    application.add_handler(CommandHandler("fenster", fenster))
+    application.add_handler(CallbackQueryHandler(fenster_callback, pattern=r"^fenster:"))
     return application

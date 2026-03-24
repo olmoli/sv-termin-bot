@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-VERSION = "0.30"
+VERSION = "0.31"
 
 load_dotenv()
 

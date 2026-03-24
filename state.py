@@ -6,6 +6,9 @@ from datetime import datetime
 # um Doppel-Benachrichtigungen zu verhindern.
 last_notified_date: datetime | None = None
 
+# Maximale Tage bis zum Termin für automatische Alerts (None = kein Filter)
+max_days_ahead: int | None = None
+
 # Verhindert gleichzeitige Checks durch /start und monitor_loop
 check_lock = asyncio.Lock()
 
