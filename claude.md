@@ -1,6 +1,6 @@
 # sv-termin-bot — Project Knowledge Base
 
-**Version: v0.27**
+**Version: v0.28**
 
 ---
 
@@ -16,7 +16,7 @@ A Telegram bot that monitors the Straßenverkehrsamt Bochum (Bochum vehicle regi
 
 ## 2. Current Status
 
-- **Version:** v0.27
+- **Version:** v0.28
 - **State:** MVP complete and functional
 - **Active subscribers:** 1 (chat_id: 836882040)
 - **Check interval:** 300 seconds (5 minutes, configurable via `.env`)
