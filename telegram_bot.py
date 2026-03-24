@@ -61,8 +61,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         f"sv-termin-bot v{VERSION}\n\n"
         "Ich zeige dir gleich den nächsten freien Termin beim Straßenverkehrsamt Bochum.\n\n"
-        "Automatische Alerts nur wenn ein Termin in dein Zeitfenster fällt (/fenster).\n\n"
-        "Mit /stop kannst du die Benachrichtigungen deaktivieren."
+        f"Für welchen Zeitraum soll ich dich benachrichtigen? (Aktuell: {_window_label()})",
+        reply_markup=_fenster_keyboard(),
     )
 
     # Sofortcheck – ignoriert das Zeitfenster, zeigt immer den besten verfügbaren Termin
