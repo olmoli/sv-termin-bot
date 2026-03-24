@@ -1,6 +1,6 @@
 # sv-termin-bot — Project Knowledge Base
 
-**Version: v0.28**
+**Version: v0.29**
 
 ---
 
@@ -16,11 +16,11 @@ A Telegram bot that monitors the Straßenverkehrsamt Bochum (Bochum vehicle regi
 
 ## 2. Current Status
 
-- **Version:** v0.28
+- **Version:** v0.29
 - **State:** MVP complete and functional
 - **Active subscribers:** 1 (chat_id: 836882040)
 - **Check interval:** 300 seconds (5 minutes, configurable via `.env`)
-- **Monitoring logic:** Only notifies if a NEW (earlier) appointment date is found; no duplicate alerts
+- **Monitoring logic:** Notifies when a better (earlier) slot appears; resets when slot gets worse so the next improvement triggers a fresh alert. No duplicate alerts for the same slot.
 
 ---
 
