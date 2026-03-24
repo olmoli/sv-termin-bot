@@ -37,17 +37,18 @@ async def monitor_loop(application) -> None:
 
                 if available:
                     current_date = state.parse_date(first_date)
-                    if current_date and (
-                        state.last_notified_date is None
-                        or current_date < state.last_notified_date
-                    ):
-                        should_notify = True
-                        notify_url = booking_url
-                        notify_date = first_date
-                        state.last_notified_date = current_date
-                        logger.info("Neuer frühester Termin: %s – sende Benachrichtigung.", first_date)
-                    else:
-                        logger.info("Bekannter oder späterer Termin (%s) – keine Benachrichtigung.", first_date)
+                    if current_date:
+                        if state.last_notified_date is None or current_date < state.last_notified_date:
+                            should_notify = True
+                            notify_url = booking_url
+                            notify_date = first_date
+                            state.last_notified_date = current_date
+                            logger.info("Neuer frühester Termin: %s – sende Benachrichtigung.", first_date)
+                        elif current_date > state.last_notified_date:
+                            logger.info("Späterer Termin (%s) – Reset für nächste Verbesserung.", first_date)
+                            state.last_notified_date = None
+                        else:
+                            logger.info("Gleicher Termin (%s) – keine Benachrichtigung.", first_date)
                 else:
                     if state.last_notified_date is not None:
                         logger.info("Keine Termine mehr verfügbar – Reset.")
