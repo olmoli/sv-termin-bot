@@ -1,6 +1,14 @@
 # sv-termin-bot — Project Knowledge Base
 
-**Version: v0.33**
+**Version: v0.35**
+
+## Recent Changes
+- v0.35 — Switch Playwright from Chromium to Firefox to fix SIGTRAP crash on Railway
+- v0.34 — Fix Chromium SIGTRAP crash on Railway: add --single-process and --disable-gpu
+- v0.33 — Fix grammar and clarify window vs. shown slot
+- v0.32 — Add R6: always output commit message with version number
+- v0.31 — Show /fenster buttons immediately on /start
+- v0.30 — Fix timezone: set Europe/Berlin so scraped times match website display
 
 ---
 
@@ -16,7 +24,7 @@ A Telegram bot that monitors the Straßenverkehrsamt Bochum (Bochum vehicle regi
 
 ## 2. Current Status
 
-- **Version:** v0.33
+- **Version:** v0.35
 - **State:** MVP complete and functional
 - **Active subscribers:** 1 (chat_id: 836882040)
 - **Check interval:** 300 seconds (5 minutes, configurable via `.env`)
@@ -187,3 +195,14 @@ The "Current Status" section and TODO list must always reflect the real state of
 ### R6 — Commit Message Format
 After every commit, always output the commit message to the user including the version number.
 Example: `"Fix timezone: set Europe/Berlin so scraped times match website display (v0.30)"`
+
+### R7 — Commit History in CLAUDE.md
+Maintain a short commit history at the top of `CLAUDE.md`, directly below the version line. Update it with every commit — add the new entry at the top, keep the last 10 entries, remove older ones.
+
+Format:
+```
+## Recent Changes
+- v0.35 — Switch Playwright from Chromium to Firefox to fix SIGTRAP crash on Railway
+- v0.34 — Fix Chromium SIGTRAP crash on Railway: add --single-process and --disable-gpu
+- ...
+```
